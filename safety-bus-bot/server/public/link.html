@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Link Parent Account</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <h2>กำลังเชื่อมบัญชี...</h2>
+  <script>
+    (async () => {
+      try {
+        await liff.init({ liffId: "{{LIFF_ID}}" });
+        if (!liff.isLoggedIn()) liff.login();
+
+        const idToken = liff.getIDToken();
+        const urlParams = new URLSearchParams(location.search);
+        const token = urlParams.get('t');
+
+        const resp = await fetch('/link/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, idToken })
+        });
+        const data = await resp.json();
+
+        document.body.innerHTML = `
+          <h2>${data.ok ? 'ผูกบัญชีสำเร็จ' : 'ล้มเหลว'}</h2>
+          <p>${data.message || ''}</p>
+          <button onclick="liff.openWindow({ url: 'https://line.me/', external: false })">
+            กลับไปที่ LINE
+          </button>
+        `;
+      } catch (err) {
+        document.body.innerHTML = '<h2>เกิดข้อผิดพลาด</h2><pre>' + (err?.message || err) + '</pre>';
+      }
+    })();
+  </script>
+</body>
+</html>
