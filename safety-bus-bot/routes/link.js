@@ -1,9 +1,11 @@
 // routes/link.js
-const express = require('express');
-const axios = require('axios');
-const { supabase } = require('../lib/db');
-const { consumeLinkToken, markTokenUsed } = require('../lib/tokens');
-const { lineClient } = require('../lib/line');
+import express from 'express';
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { supabase } from '../lib/db.js';
+import { consumeToken, markTokenUsed } from '../lib/tokens.js';
+import { lineClient } from '../lib/line.js';
 
 const router = express.Router();
 
@@ -24,7 +26,7 @@ router.post('/confirm', async (req, res) => {
     const idt = await verifyIdToken(idToken);
     const lineUserId = idt.sub;
 
-    const row = await consumeLinkToken(token); // ตรวจ token สด/ยังไม่ใช้
+    const row = await consumeToken(token); // ตรวจ token สด/ยังไม่ใช้
 
     const { error: insErr } = await supabase.from('parent_line_links')
       .insert({ parent_id: row.parent_id, line_user_id: lineUserId });
@@ -51,4 +53,21 @@ router.post('/confirm', async (req, res) => {
   }
 });
 
-module.exports = router;
+// Route สำหรับ LIFF leave form
+router.get('/leave-form', (req, res) => {
+  try {
+    const filePath = path.join(process.cwd(), 'server', 'public', 'leave-form.html');
+    let html = fs.readFileSync(filePath, 'utf8');
+    
+    // แทนที่ LIFF_ID ด้วยค่าจริงจาก environment
+    html = html.replace('{{LIFF_ID}}', process.env.LINE_LIFF_ID);
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (error) {
+    console.error('Error serving leave form:', error);
+    res.status(500).send('Error loading leave form');
+  }
+});
+
+export default router;

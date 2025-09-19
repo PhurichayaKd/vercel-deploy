@@ -75,9 +75,9 @@ type Draft = {
   studentName: string;
   grade: string;
   studentPhone: string;
+  studentLine: string;
   rfidCardId: number | null;
   rfidCode: string;
-  studentLine: string;
   startDate: string | null; // YYYY-MM-DD
   endDate: string | null;   // YYYY-MM-DD
   lat: number | null;
@@ -89,8 +89,8 @@ const getDraft = () => __draft;
 const setDraft = (patch: Partial<Draft>) => {
   __draft = {
     ...(__draft ?? {
-      studentName: '', grade: '', studentPhone: '',
-      rfidCardId: null, rfidCode: '', studentLine: '',
+      studentName: '', grade: '', studentPhone: '', studentLine: '',
+      rfidCardId: null, rfidCode: '',
       startDate: null, endDate: null, lat: null, lng: null,
       guardians: [{ name: '', phone: '', line: '', relationship: '', is_primary: true }],
     }),
@@ -105,8 +105,8 @@ type StudentRow = {
   student_name: string;
   grade: string;
   student_phone?: string | null;
+  // student_line_id ถูกย้ายไปยัง student_line_links table แล้ว
   rfid_tag?: string | null; // legacy
-  student_line_id: string | null;
   parent_id: number | null;
   start_date: string | null;
   end_date: string | null;
@@ -140,6 +140,7 @@ export default function StudentFormScreen() {
   const [studentName, setStudentName] = useState('');
   const [grade, setGrade] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
+  const [studentLine, setStudentLine] = useState('');
 
   // RFID
   const [rfidCardId, setRfidCardId] = useState<number | null>(null);
@@ -186,9 +187,9 @@ export default function StudentFormScreen() {
       setStudentName(d.studentName);
       setGrade(d.grade);
       setStudentPhone(d.studentPhone);
+      setStudentLine(d.studentLine);
       setRfidCardId(d.rfidCardId ?? null);
       setRfidCode(d.rfidCode ?? '');
-      setStudentLine(d.studentLine);
       setStartDate(d.startDate ? new Date(d.startDate) : null);
       setEndDate(d.endDate ? new Date(d.endDate) : null);
       setLat(d.lat);
@@ -199,7 +200,7 @@ export default function StudentFormScreen() {
   }, []);
   /* ------------------------------------------------- */
 
-  const [studentLine, setStudentLine] = useState('');
+  // studentLine variable removed - no longer stored in database
 
   // พิกัดกลับจากแผนที่
   useEffect(() => {
@@ -246,7 +247,14 @@ export default function StudentFormScreen() {
       try {
         // นักเรียน
         const { data: stu, error: stuErr } = await supabase
-          .from('students').select('*').eq('student_id', Number(id)).maybeSingle();
+          .from('students')
+          .select(`
+            *,
+            student_line_links!inner(line_user_id, active)
+          `)
+          .eq('student_id', Number(id))
+          .eq('student_line_links.active', true)
+          .maybeSingle();
         if (stuErr) throw stuErr;
         if (!alive || !stu) return;
         const s = stu as StudentRow;
@@ -254,7 +262,9 @@ export default function StudentFormScreen() {
         setStudentName(s.student_name ?? '');
         setGrade(s.grade ?? '');
         setStudentPhone(s.student_phone ?? '');
-        setStudentLine(s.student_line_id ?? '');
+        const lineLinks = (s as any).student_line_links;
+        const lineUserId = Array.isArray(lineLinks) ? lineLinks[0]?.line_user_id : lineLinks?.line_user_id;
+        setStudentLine(lineUserId ?? '');
         setStartDate(s.start_date ? new Date(s.start_date) : null);
         setEndDate(s.end_date ? new Date(s.end_date) : null);
         setLat(toNumberOrNull(s.home_latitude));
@@ -280,25 +290,33 @@ export default function StudentFormScreen() {
         setRfidCode(resolvedRfidCode);
 
         // ผู้ปกครองทั้งหมด
-        const { data: gs } = await supabase
+        const { data: guardianRows, error: guardianErr } = await supabase
           .from('student_guardians')
           .select(`
             parent_id,
             relationship,
             is_primary,
-            parents:parent_id(parent_name, parent_phone, parent_line_id)
+            parents:parent_id(
+              parent_name, 
+              parent_phone,
+              parent_line_links(line_user_id, active)
+            )
           `)
           .eq('student_id', Number(id));
 
         let gList: GuardianDraft[] = [];
-        if (gs?.length) {
-          gList = gs.map((row: any) => {
+        if (guardianRows?.length) {
+          gList = guardianRows.map((row: any) => {
             const p = Array.isArray(row.parents) ? row.parents[0] : row.parents; // เคส array/object
+            const parentLinks = p?.parent_line_links;
+            const activeLink = Array.isArray(parentLinks) 
+              ? parentLinks.find((link: any) => link.active)
+              : parentLinks?.active ? parentLinks : null;
             return {
               parent_id: row.parent_id,
               name: p?.parent_name ?? '',
               phone: p?.parent_phone ?? '',
-              line: p?.parent_line_id ?? '',
+              line: activeLink?.line_user_id ?? '',
               relationship: row.relationship ?? '',
               is_primary: !!row.is_primary,
             };
@@ -309,14 +327,23 @@ export default function StudentFormScreen() {
           if (missingIds.length) {
             const { data: parentsRows } = await supabase
               .from('parents')
-              .select('parent_id,parent_name,parent_phone,parent_line_id')
+              .select(`
+                parent_id,
+                parent_name,
+                parent_phone,
+                parent_line_links!inner(
+                  line_user_id
+                )
+              `)
+              .eq('parent_line_links.active', true)
               .in('parent_id', missingIds);
             if (parentsRows?.length) {
               const map = new Map<number, any>(parentsRows.map((r: any) => [r.parent_id, r]));
               gList = gList.map(g => {
                 if (!g.name && g.parent_id && map.has(g.parent_id)) {
                   const p = map.get(g.parent_id);
-                  return { ...g, name: p.parent_name ?? '', phone: p.parent_phone ?? '', line: p.parent_line_id ?? '' };
+                  const lineId = p.parent_line_links?.[0]?.line_user_id ?? '';
+                  return { ...g, name: p.parent_name ?? '', phone: p.parent_phone ?? '', line: lineId };
                 }
                 return g;
               });
@@ -338,7 +365,6 @@ export default function StudentFormScreen() {
           studentPhone: s.student_phone ?? '',
           rfidCardId: resolvedRfidCardId,
           rfidCode: resolvedRfidCode,
-          studentLine: s.student_line_id ?? '',
           startDate: s.start_date ?? null,
           endDate: s.end_date ?? null,
           lat: toNumberOrNull(s.home_latitude),
@@ -395,11 +421,23 @@ export default function StudentFormScreen() {
         .insert({
           parent_name: name || 'ไม่ระบุชื่อ',
           parent_phone: phone,
-          parent_line_id: line,
         })
         .select('parent_id')
         .single();
       if (error) throw error;
+      
+      // Insert LINE ID into parent_line_links
+      if (line) {
+        const { error: linkError } = await supabase
+          .from('parent_line_links')
+          .insert({
+            parent_id: data.parent_id,
+            line_user_id: line,
+            active: true
+          });
+        if (linkError) throw linkError;
+      }
+      
       newIds.push(data.parent_id as number);
     }
     return newIds;
@@ -418,10 +456,35 @@ export default function StudentFormScreen() {
           .update({
             parent_name: name || 'ไม่ระบุชื่อ',
             parent_phone: phone || null,
-            parent_line_id: line || null,
           })
           .eq('parent_id', g.parent_id);
         if (error) throw error;
+        
+        // Manage LINE ID in parent_line_links
+        if (line) {
+          // Deactivate old links
+          await supabase
+            .from('parent_line_links')
+            .update({ active: false })
+            .eq('parent_id', g.parent_id);
+          
+          // Insert/update new link
+          const { error: linkError } = await supabase
+            .from('parent_line_links')
+            .upsert({
+              parent_id: g.parent_id,
+              line_user_id: line,
+              active: true
+            });
+          if (linkError) throw linkError;
+        } else {
+          // Deactivate all links if no LINE ID
+          await supabase
+            .from('parent_line_links')
+            .update({ active: false })
+            .eq('parent_id', g.parent_id);
+        }
+        
         ids.push(g.parent_id);
       } else {
         if (!phone || !line) { throw new Error('กรอกเบอร์และ LINE ของผู้ปกครองให้ครบ'); }
@@ -430,11 +493,23 @@ export default function StudentFormScreen() {
           .insert({
             parent_name: name || 'ไม่ระบุชื่อ',
             parent_phone: phone,
-            parent_line_id: line,
           })
           .select('parent_id')
           .single();
         if (error) throw error;
+        
+        // Insert LINE ID into parent_line_links
+        if (line) {
+          const { error: linkError } = await supabase
+            .from('parent_line_links')
+            .insert({
+              parent_id: data.parent_id,
+              line_user_id: line,
+              active: true
+            });
+          if (linkError) throw linkError;
+        }
+        
         ids.push(data.parent_id as number);
       }
     }
@@ -493,8 +568,9 @@ export default function StudentFormScreen() {
       Alert.alert('ข้อมูลไม่ครบ', 'กรอกเบอร์โทรของนักเรียน');
       return false;
     }
-    // LINE นักเรียนบังคับเฉพาะหน้าเพิ่ม (หน้าแก้ไขล็อกไว้)
-    if (!isEdit && !studentLine.trim()) {
+    
+    // LINE ID ของนักเรียน (เพิ่ม/แก้ไข) — บังคับ
+    if (!studentLine.trim()) {
       Alert.alert('ข้อมูลไม่ครบ', 'กรอก LINE ID ของนักเรียน');
       return false;
     }
@@ -571,7 +647,6 @@ export default function StudentFormScreen() {
         // อัปเดตเฉพาะฟิลด์ที่อนุญาต (นักเรียน)
         const payloadEdit: any = {
           student_phone: studentPhone?.trim(),
-          // student_line_id คงเดิม (ล็อก)
           start_date: formatLocalDate(startDate),
           end_date: formatLocalDate(endDate),
           home_latitude: lat,
@@ -581,6 +656,30 @@ export default function StudentFormScreen() {
           .from('students').update(payloadEdit).eq('student_id', Number(id));
         if (stuErr) throw stuErr;
         studentId = Number(id);
+
+        // จัดการ LINE ID ของนักเรียนแยกต่างหาก
+        if (studentLine?.trim()) {
+          // ลบ link เก่า
+          await supabase
+            .from('student_line_links')
+            .update({ active: false })
+            .eq('student_id', studentId);
+          
+          // เพิ่ม link ใหม่
+          await supabase
+            .from('student_line_links')
+            .insert({
+              student_id: studentId,
+              line_user_id: studentLine.trim(),
+              active: true
+            });
+        } else {
+          // ถ้าไม่มี LINE ID ให้ลบ link เก่าทั้งหมด
+          await supabase
+            .from('student_line_links')
+            .update({ active: false })
+            .eq('student_id', studentId);
+        }
 
         // ผู้ปกครองเดิม: อัปเดตเฉพาะเบอร์ + is_primary
         await updateExistingGuardians(studentId, guardians);
@@ -609,7 +708,6 @@ export default function StudentFormScreen() {
           student_name: studentName.trim(),
           grade: grade.trim(),
           student_phone: studentPhone.trim(),
-          student_line_id: studentLine.trim(),
           start_date: formatLocalDate(startDate),
           end_date: formatLocalDate(endDate),
           home_latitude: lat,
@@ -619,6 +717,18 @@ export default function StudentFormScreen() {
           .from('students').insert(payloadCreate).select('student_id').single();
         if (insErr) throw insErr;
         studentId = ins.student_id as number;
+        
+        // จัดการ LINE ID ของนักเรียนแยกต่างหาก
+        if (studentLine?.trim()) {
+          await supabase
+            .from('student_line_links')
+            .insert({
+              student_id: studentId,
+              line_user_id: studentLine.trim(),
+              active: true
+            });
+        }
+        
         // ผูก RFID
         if (rfidCardId) await callAssignRfid(studentId, rfidCardId);
 
@@ -694,8 +804,8 @@ export default function StudentFormScreen() {
   const pickLocation = () => {
     // เก็บ draft ปัจจุบันก่อน
     setDraft({
-      studentName, grade, studentPhone,
-      rfidCardId, rfidCode, studentLine,
+      studentName, grade, studentPhone, studentLine,
+      rfidCardId, rfidCode,
       startDate: formatLocalDate(startDate),
       endDate: formatLocalDate(endDate),
       lat, lng, guardians,
@@ -765,17 +875,14 @@ export default function StudentFormScreen() {
                 maxLength={10}
               />
             </View>
-            <View style={[styles.col, { flex: 0.8 }]}>
-              <Text style={styles.label}>LINE ID (นักเรียน)</Text>
+            <View style={styles.col}>
+              <Text style={styles.label}>LINE ID นักเรียน</Text>
               <TextInput
-                style={[styles.input, isEdit && { ...readOnlyBg, ...readOnlyBorder }]}
+                style={styles.input}
                 value={studentLine}
-                onChangeText={(t) => { if (!isEdit) { setStudentLine(t); setDraft({ studentLine: t }); } }}
-                placeholder="เช่น pop_123"
+                onChangeText={(t) => { setStudentLine(t); setDraft({ studentLine: t }); }}
+                placeholder="เช่น @student123"
                 placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                autoCorrect={false}
-                {...ro(!isEdit)}
               />
             </View>
           </View>
@@ -909,20 +1016,20 @@ export default function StudentFormScreen() {
             <View style={[styles.col, { flex: 1 }]}>
               <Text style={styles.label}>วันเริ่ม</Text>
               <TouchableOpacity style={styles.dateBtn} onPress={() => setShowStartPicker(true)}>
-              <Ionicons name="calendar-outline" size={18} color={COLORS.textSecondary} />
-              <Text style={styles.dateTxt}>
-                {startDate ? formatLocalDate(startDate) : 'เลือกวันเริ่ม'}
-              </Text>
-            </TouchableOpacity>
+                <Ionicons name="calendar-outline" size={18} color={COLORS.textSecondary} />
+                <Text style={styles.dateTxt}>
+                  {startDate ? formatLocalDate(startDate) : 'เลือกวันเริ่ม'}
+                </Text>
+              </TouchableOpacity>
             </View>
             <View style={[styles.col, { flex: 1 }]}>
               <Text style={styles.label}>วันสิ้นสุด</Text>
               <TouchableOpacity style={styles.dateBtn} onPress={() => setShowEndPicker(true)}>
-              <Ionicons name="calendar-outline" size={18} color={COLORS.textSecondary} />
-              <Text style={styles.dateTxt}>
-                {endDate ? formatLocalDate(endDate) : 'เลือกวันสิ้นสุด'}
-              </Text>
-            </TouchableOpacity>
+                <Ionicons name="calendar-outline" size={18} color={COLORS.textSecondary} />
+                <Text style={styles.dateTxt}>
+                  {endDate ? formatLocalDate(endDate) : 'เลือกวันสิ้นสุด'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 

@@ -1,0 +1,340 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>แบบฟอร์มแจ้งลาหยุด</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #1DB446, #0ea832);
+      color: white;
+      padding: 25px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .content {
+      padding: 25px 20px;
+    }
+    .student-info {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      border-left: 4px solid #1DB446;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .info-label {
+      color: #666;
+      font-weight: 500;
+    }
+    .info-value {
+      color: #333;
+      font-weight: bold;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+    .form-control {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+      box-sizing: border-box;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: #1DB446;
+    }
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .btn {
+      padding: 12px 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s;
+      text-align: center;
+    }
+    .btn.active {
+      background: #1DB446;
+      color: white;
+      border-color: #1DB446;
+    }
+    .btn:hover {
+      border-color: #1DB446;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #1DB446, #0ea832);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .submit-btn:hover {
+      transform: translateY(-2px);
+    }
+    .submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+    .error {
+      color: #dc3545;
+      background: #f8d7da;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .success {
+      color: #155724;
+      background: #d4edda;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📝 แบบฟอร์มแจ้งลาหยุด</h1>
+    </div>
+    <div class="content">
+      <div class="loading" id="loading">
+        <p>กำลังโหลดข้อมูล...</p>
+      </div>
+      
+      <div class="error" id="error"></div>
+      <div class="success" id="success"></div>
+      
+      <div id="form-container" style="display: none;">
+        <div class="student-info" id="student-info">
+          <!-- ข้อมูลนักเรียนจะแสดงที่นี่ -->
+        </div>
+        
+        <form id="leave-form">
+          <div class="form-group">
+            <label class="form-label">📅 วันที่ลา</label>
+            <input type="date" class="form-control" id="leave-date" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">📋 ประเภทการลา</label>
+            <div class="btn-group">
+              <div class="btn" data-type="sick">🤒 ลาป่วย</div>
+              <div class="btn" data-type="personal">📋 ลากิจ</div>
+              <div class="btn" data-type="absent">❌ ไม่มาเรียน</div>
+            </div>
+            <input type="hidden" id="leave-type" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">💬 เหตุผลการลา</label>
+            <textarea class="form-control" id="reason" rows="4" placeholder="กรุณาระบุเหตุผลการลา..." required></textarea>
+          </div>
+          
+          <button type="submit" class="submit-btn" id="submit-btn">ส่งคำขอลา</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let studentData = null;
+    let selectedLeaveType = null;
+
+    (async () => {
+      try {
+        document.getElementById('loading').style.display = 'block';
+        
+        await liff.init({ liffId: "{{LIFF_ID}}" });
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const idToken = liff.getIDToken();
+        const profile = await liff.getProfile();
+        
+        // ดึงข้อมูลนักเรียน
+        const response = await fetch('/api/student-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            idToken: idToken,
+            userId: profile.userId 
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          showError(result.message || 'ไม่พบข้อมูลนักเรียน');
+          return;
+        }
+        
+        studentData = result.data;
+        displayStudentInfo(studentData);
+        setupForm();
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('form-container').style.display = 'block';
+        
+      } catch (err) {
+        console.error('Error:', err);
+        showError('เกิดข้อผิดพลาดในการโหลดข้อมูล: ' + (err?.message || err));
+      }
+    })();
+
+    function displayStudentInfo(data) {
+      const student = data.student;
+      const infoHtml = `
+        <div class="info-row">
+          <span class="info-label">ชื่อ:</span>
+          <span class="info-value">${student.student_name}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">รหัส:</span>
+          <span class="info-value">${student.student_id}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">ชั้น:</span>
+          <span class="info-value">${student.class || 'ไม่ระบุ'}</span>
+        </div>
+      `;
+      document.getElementById('student-info').innerHTML = infoHtml;
+    }
+
+    function setupForm() {
+      // ตั้งค่าวันที่เป็นวันนี้
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('leave-date').value = today;
+      
+      // จัดการการเลือกประเภทการลา
+      document.querySelectorAll('.btn[data-type]').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.btn[data-type]').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          selectedLeaveType = this.dataset.type;
+          document.getElementById('leave-type').value = selectedLeaveType;
+        });
+      });
+      
+      // จัดการการส่งฟอร์ม
+      document.getElementById('leave-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (!selectedLeaveType) {
+          showError('กรุณาเลือกประเภทการลา');
+          return;
+        }
+        
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'กำลังส่ง...';
+        
+        try {
+          const formData = {
+            student_id: studentData.student.student_id,
+            leave_type: selectedLeaveType,
+            leave_date: document.getElementById('leave-date').value,
+            reason: document.getElementById('reason').value,
+            parent_id: studentData.parent_id || studentData.student_id
+          };
+          
+          const response = await fetch('/api/submit-leave', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            showSuccess('ส่งคำขอลาสำเร็จ! กำลังปิดหน้าต่าง...');
+            setTimeout(() => {
+              liff.closeWindow();
+            }, 2000);
+          } else {
+            showError(result.message || 'เกิดข้อผิดพลาดในการส่งคำขอ');
+          }
+          
+        } catch (err) {
+          console.error('Submit error:', err);
+          showError('เกิดข้อผิดพลาดในการส่งข้อมูล');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'ส่งคำขอลา';
+        }
+      });
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('error');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      document.getElementById('success').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function showSuccess(message) {
+      const successDiv = document.getElementById('success');
+      successDiv.textContent = message;
+      successDiv.style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

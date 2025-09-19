@@ -1,6 +1,6 @@
 // lib/tokens.js
-const { v4: uuidv4 } = require('uuid');
-const { supabase } = require('./db');
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from './db.js';
 
 async function issueLinkToken({ parent_id, issued_by }) {
   const token = uuidv4();
@@ -31,4 +31,4 @@ async function markTokenUsed(token, line_user_id) {
   if (error) throw error;
 }
 
-module.exports = { issueLinkToken, consumeLinkToken, markTokenUsed };
+export { issueLinkToken as issueToken, consumeLinkToken as consumeToken, markTokenUsed };

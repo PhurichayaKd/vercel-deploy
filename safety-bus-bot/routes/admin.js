@@ -1,7 +1,7 @@
 // routes/admin.js
-const express = require('express');
-const QRCode = require('qrcode');
-const { issueLinkToken } = require('../lib/tokens');
+import express from 'express';
+import QRCode from 'qrcode';
+import { issueToken } from '../lib/tokens.js';
 
 const router = express.Router();
 
@@ -14,7 +14,7 @@ router.get('/create-link', async (req, res) => {
     const parent_id = parseInt(req.query.parent_id || '1', 10);
     const driver_id = parseInt(req.query.driver_id || '100', 10);
 
-    const token = await issueLinkToken({ parent_id, issued_by: driver_id });
+    const token = await issueToken({ parent_id, issued_by: driver_id });
     const url = `${process.env.BASE_URL}/link?t=${token}`;
     const dataUrl = await QRCode.toDataURL(url);
 
@@ -31,4 +31,4 @@ router.get('/create-link', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

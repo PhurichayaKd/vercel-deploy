@@ -54,12 +54,7 @@ export default function LoginScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
-  // ถ้ามี session อยู่แล้ว ไม่ต้องเห็นหน้า login
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace('/(tabs)/home');
-    });
-  }, []);
+  // ลบการตรวจสอบ session ออก ให้ RootLayoutNav จัดการแทน
 
   const handleLogin = async () => {
     try {
@@ -70,9 +65,8 @@ export default function LoginScreen() {
       });
       if (error) {
         Alert.alert('เข้าสู่ระบบไม่สำเร็จ', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      } else {
-        router.replace('/(tabs)/home');
       }
+      // ลบ router.replace ออก ให้ AuthContext จัดการ navigation แทน
     } finally {
       setLoading(false);
     }

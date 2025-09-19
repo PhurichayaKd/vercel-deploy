@@ -1,6 +1,8 @@
 import express from "express";
-import { middleware, Client } from "@line/bot-sdk";
+import { middleware, Client } from '@line/bot-sdk';
 import dotenv from "dotenv";
+
+import { handleTextMessage, handlePostback, handleFollow } from '../lib/handlers.js';
 
 dotenv.config();
 
@@ -9,43 +11,39 @@ const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
-const client = new Client(config); // ✅ สร้าง client ไว้ครั้งเดียว ไม่ต้องสร้างใหม่ทุก event
+const client = new Client(config);
 const app = express();
 
-// LINE middleware ใช้ตรวจสอบ signature + parse body
-app.post("/webhook", middleware(config), async (req, res) => {
-  console.log("🌐 [Webhook Event Received]");
-  console.log(JSON.stringify(req.body, null, 2));
+// เพิ่ม CORS และ JSON parsing
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-  try {
-    await Promise.all(
-      req.body.events.map(async (event) => {
-        console.log("👉 Single event:", event);
-
-        // ถ้าเป็นข้อความ text → ตอบกลับ
-        if (event.type === "message" && event.message.type === "text") {
-          await client.replyMessage(event.replyToken, {
-            type: "text",
-            text: `คุณส่งข้อความว่า: ${event.message.text}`,
-          });
-        }
-
-        // รองรับ follow event (ตอนผู้ใช้กด Add Friend)
-        if (event.type === "follow") {
-          await client.replyMessage(event.replyToken, {
-            type: "text",
-            text: "ยินดีต้อนรับ! 🚍 คุณได้เพิ่ม Safety Bus แล้ว",
-          });
-        }
-      })
-    );
-
-    res.status(200).end();
-  } catch (err) {
-    console.error("❌ Error handling event:", err);
-    res.status(500).end();
+// CORS configuration
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
   }
 });
+
+// Import และใช้ API routes
+import apiRoutes from '../routes/api.js';
+import linkRoutes from '../routes/link.js';
+import webhookRoutes from '../routes/webhook.js';
+app.use('/api', apiRoutes);
+app.use('/link', linkRoutes);
+app.use('/webhook', webhookRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Webhook endpoint is now handled by routes/webhook.js
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

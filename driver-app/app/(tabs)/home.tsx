@@ -382,6 +382,7 @@ const HomePage = () => {
           <View style={styles.menuGrid}>
             <MenuCard icon="person-outline"     label="ข้อมูลผู้ใช้"   to="/manage/students/profile" />
             <MenuCard icon="car-outline"        label="ข้อมูลคนขับ"   to="/driver-info" />
+            <MenuCard icon="link-outline"       label="เชื่อมโยงบัญชี" to="/auth/link-account" />
             <MenuCard icon="card-outline"       label="ออกบัตรใหม่"   to={PATHS.issueCard} />
             <MenuCard icon="document-text-outline" label="รายงาน"     to={PATHS.reports} />
           </View>

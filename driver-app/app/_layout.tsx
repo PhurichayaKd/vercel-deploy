@@ -36,15 +36,19 @@ function RootLayoutNav() {
     if (loading) return;
 
     const first = segments[0] as string | undefined;
+    const inAuthFlow = first === 'auth';
+    const inTabsFlow = first === '(tabs)';
 
-    // ❗ ไม่มี session → ไป login
+    // ❗ ไม่มี session → ไป login (แต่ไม่ redirect ถ้าอยู่ในหน้า auth แล้ว)
     if (!session) {
-      if (first !== 'auth') router.replace('/auth/login');
+      if (!inAuthFlow) {
+        router.replace('/auth/login');
+      }
       return;
     }
 
-    // ✅ มี session แล้ว → ถ้าอยู่หน้า login หรือราก ส่งไปแท็บหลัก
-    if (session && (first === 'auth' || first === undefined)) {
+    // ✅ มี session แล้ว → ถ้าอยู่หน้า login ส่งไปแท็บหลัก (แต่ไม่ redirect ถ้าอยู่ในแท็บแล้ว)
+    if (session && inAuthFlow) {
       router.replace('/(tabs)/home');
     }
   }, [session, loading, segments]);
@@ -57,7 +61,7 @@ function RootLayoutNav() {
   return (
     <>
       <Stack>
-        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>

@@ -7,7 +7,14 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
-    "test": "echo \"No test specified\" && exit 1"
+    "test": "node scripts/test-bot.js",
+    "test:help": "node scripts/test-bot.js --help",
+    "setup-menu": "node scripts/setup-rich-menu.js",
+    "logs": "node scripts/view-logs.js",
+    "logs:follow": "node scripts/view-logs.js --follow",
+    "logs:error": "node scripts/view-logs.js --level error",
+    "health": "curl http://localhost:3000/api/health",
+    "postinstall": "echo \"📋 Next steps: 1) Copy .env.example to .env 2) Configure your environment variables 3) Run npm test\""
   },
   "keywords": [
     "line-bot",
@@ -22,9 +29,13 @@
     "@line/bot-sdk": "^10.2.0",
     "@supabase/supabase-js": "^2.57.0",
     "axios": "^1.11.0",
+    "canvas": "^3.2.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "moment": "^2.29.4",
     "qrcode": "^1.5.4",
     "uuid": "^11.1.0"
   },

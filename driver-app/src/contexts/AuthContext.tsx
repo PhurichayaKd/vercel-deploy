@@ -15,21 +15,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    
     // ตรวจสอบ session ปัจจุบัน
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
+      if (mounted) {
+        setSession(session);
+        setLoading(false);
+      }
     });
 
     // ฟังการเปลี่ยนแปลงของ auth state
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (mounted) {
+        setSession(session);
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

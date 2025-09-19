@@ -1,5 +1,8 @@
 // lib/line.js
-const line = require('@line/bot-sdk');
+import * as line from '@line/bot-sdk';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -8,4 +11,4 @@ const lineConfig = {
 
 const lineClient = new line.Client(lineConfig);
 
-module.exports = { lineConfig, lineClient };
+export { lineConfig, lineClient };
