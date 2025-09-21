@@ -8,7 +8,7 @@ class LiffDatePicker {
     async init() {
         try {
             // Initialize LIFF
-            await liff.init({ liffId: 'YOUR_LIFF_ID' }); // จะต้องแทนที่ด้วย LIFF ID จริง
+            await liff.init({ liffId: '2008065330-AXGy9xda' }); // จะต้องแทนที่ด้วย LIFF ID จริง
             
             if (!liff.isLoggedIn()) {
                 liff.login();
