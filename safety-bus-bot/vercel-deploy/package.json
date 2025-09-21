@@ -1,0 +1,25 @@
+{
+  "name": "safety-bus-liff-app",
+  "version": "1.0.0",
+  "description": "LINE LIFF App for Safety Bus Leave Request",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s .",
+    "build": "echo 'No build process needed for static files'"
+  },
+  "keywords": [
+    "LINE",
+    "LIFF",
+    "Safety Bus",
+    "Leave Request"
+  ],
+  "author": "Safety Bus Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

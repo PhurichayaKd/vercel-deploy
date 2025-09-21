@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Bus LIFF App</title>
+    <link rel="stylesheet" href="./css/date-picker.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚌 Safety Bus</h1>
+            <h2>📅 เลือกวันที่แจ้งลา</h2>
+        </div>
+        
+        <div class="date-picker-container">
+            <div class="date-input-wrapper">
+                <label for="leave-date">วันที่แจ้งลา:</label>
+                <input type="date" id="leave-date" name="leave-date" required>
+            </div>
+            
+            <div class="selected-date" id="selected-date" style="display: none;">
+                <p>วันที่เลือก: <span id="selected-date-text"></span></p>
+            </div>
+            
+            <div class="button-container">
+                <button id="confirm-btn" class="confirm-button" disabled>
+                    ✅ ยืนยันวันที่
+                </button>
+                <button id="cancel-btn" class="cancel-button">
+                    ❌ ยกเลิก
+                </button>
+            </div>
+        </div>
+        
+        <div class="info">
+            <p>💡 เลือกวันที่ที่ต้องการแจ้งลาล่วงหน้า</p>
+        </div>
+    </div>
+    
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="./js/date-picker.js"></script>
+</body>
+</html>
